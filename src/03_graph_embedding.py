@@ -10,7 +10,6 @@ OUTPUT_PATH = "./outputs/node2vec_embeddings.csv"
 df = pd.read_csv(DATA_PATH)
 RUH_IATA, RUH_ICAO = "RUH", "OERK"
 
-# تحديد الرحلات الصادرة/الواردة من/إلى RUH
 is_origin_RUH = (df.get("origin_airport_iata","").astype(str).str.upper()==RUH_IATA) | \
                 (df.get("origin_airport_icao","").astype(str).str.upper()==RUH_ICAO)
 is_dest_RUH   = (df.get("destination_airport_iata","").astype(str).str.upper()==RUH_IATA) | \
