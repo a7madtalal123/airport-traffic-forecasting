@@ -6,10 +6,9 @@ from math import sqrt
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from xgboost import XGBRegressor
 
-# ملفات نحتاجها من المراحل السابقة
-HOURLY_FEATS = "./outputs/hourly_features.csv"          # من run_pipeline.py
-EMB_CSV      = "./outputs/node2vec_embeddings.csv"      # من 03_graph_embedding.py
-DATA_PATH    = "./data/flights_RUH.csv"                 # لاستنتاج الوجهة المهيمنة لكل ساعة
+HOURLY_FEATS = "./outputs/hourly_features.csv"          #  run_pipeline.py
+EMB_CSV      = "./outputs/node2vec_embeddings.csv"      #  03_graph_embedding.py
+DATA_PATH    = "./data/flights_RUH.csv"               
 
 assert os.path.exists(HOURLY_FEATS), "Run src/run_pipeline.py first"
 assert os.path.exists(EMB_CSV), "Run src/03_graph_embedding.py first"
@@ -18,7 +17,7 @@ ts = pd.read_csv(HOURLY_FEATS, parse_dates=["date_hour"])
 ts["terminal_id"] = ts["movement.terminal"].astype("category").cat.codes
 emb = pd.read_csv(EMB_CSV)
 
-# نحسب الوجهة المهيمنة لكل (terminal, hour) للرحلات الصادرة من RUH فقط
+
 df = pd.read_csv(DATA_PATH)
 for col in ["movement.scheduledTime.local", "movement.scheduledTime.utc"]:
     if col in df.columns:
@@ -29,7 +28,7 @@ def pick_dt(row):
 
 df["scheduled_dt"] = df.apply(pick_dt, axis=1)
 df = df[df["scheduled_dt"].notna()].copy()
-df["date_hour"] = df["scheduled_dt"].dt.floor("h")  # ← عالجنا التحذير
+df["date_hour"] = df["scheduled_dt"].dt.floor("h")  
 
 RUH_IATA, RUH_ICAO = "RUH", "OERK"
 is_origin_RUH = (df.get("origin_airport_iata","").astype(str).str.upper()==RUH_IATA) | \
@@ -43,20 +42,19 @@ idx = hour_dest.groupby(["movement.terminal","date_hour"])["cnt"].idxmax()
 top1 = hour_dest.loc[idx, ["movement.terminal","date_hour","destination_airport_iata"]] \
                 .rename(columns={"destination_airport_iata":"dominant_dest"})
 
-# دمج الوجهة المهيمنة + التعين
+
 ts = ts.merge(top1, on=["movement.terminal","date_hour"], how="left")
 ts["dominant_dest"] = ts["dominant_dest"].astype(str)
 ts = ts.merge(emb, left_on="dominant_dest", right_on="airport", how="left").drop(columns=["airport"])
 
-# ميزات نمذجة
+
 vec_cols = [c for c in ts.columns if c.startswith("n2v_")]
 features = ["terminal_id","hour","weekday","month","is_weekend","lag1","lag3","lag6","ma3","ma6"] + vec_cols
 target   = "y"
 
-# إزالة الصفوف التي تفتقد ميزات
 data = ts.dropna(subset=features + [target]).sort_values("date_hour").reset_index(drop=True)
 
-# تقسيم زمني 80/20
+
 split = int(len(data)*0.8)
 train, test = data.iloc[:split], data.iloc[split:]
 X_train, y_train = train[features], train[target]
@@ -83,9 +81,9 @@ report = {
     "test_hours": len(y_test),
     "n_features": len(features)
 }
-print("✅ XGBoost+Node2Vec report:", report)
+print(" XGBoost+Node2Vec report:", report)
 
-# حفظ ناتج للتوثيق/الورقة
+
 os.makedirs("./outputs", exist_ok=True)
 outpath = "./outputs/xgb_node2vec_predictions.csv"
 pd.DataFrame({"date_hour": test["date_hour"], "actual": y_test, "pred": pred}).to_csv(outpath, index=False)
